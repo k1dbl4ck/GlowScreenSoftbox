@@ -8,8 +8,11 @@ final class OverlayController: ObservableObject {
         didSet { syncWindows() }
     }
 
-    @Published var dimAmount: Double = 0.4 {
-        didSet { applyDim() }
+    @Published var dimAmount: Double {
+        didSet {
+            UserDefaults.standard.set(dimAmount, forKey: Self.dimAmountKey)
+            applyDim()
+        }
     }
 
     @Published var hideNonFullscreenApps: Bool {
@@ -22,12 +25,16 @@ final class OverlayController: ObservableObject {
     @Published var enableOnCameraStart: Bool {
         didSet {
             UserDefaults.standard.set(enableOnCameraStart, forKey: Self.enableOnCameraStartKey)
+            startCameraMonitor()
         }
     }
 
     private static let hideNonFullscreenAppsKey = "hideNonFullscreenApps"
     private static let enableOnCameraStartKey = "enableOnCameraStart"
+    private static let dimAmountKey = "dimAmount"
     private static let legacyMinimizeKey = "minimizeNonFullscreenWindows"
+    private static let defaultDimAmount = 0.4
+    private static let dimAmountRange = 0.05...0.85
 
     private var windows: [NSWindow] = []
     private var screenObserver: NSObjectProtocol?
@@ -49,6 +56,12 @@ final class OverlayController: ObservableObject {
         } else {
             enableOnCameraStart = false
         }
+
+        if UserDefaults.standard.object(forKey: Self.dimAmountKey) != nil {
+            dimAmount = Self.clampedDimAmount(UserDefaults.standard.double(forKey: Self.dimAmountKey))
+        } else {
+            dimAmount = Self.defaultDimAmount
+        }
         
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
@@ -65,11 +78,8 @@ final class OverlayController: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.cameraTask?.cancel()
-                self.appHider.unhide()
-                self.wallpaper.restoreWallpapers()
+            MainActor.assumeIsolated {
+                self?.performQuitCleanup()
             }
         }
 
@@ -78,6 +88,7 @@ final class OverlayController: ObservableObject {
 
     deinit {
         cameraTask?.cancel()
+        wallpaper.restoreWallpapers()
         if let screenObserver {
             NotificationCenter.default.removeObserver(screenObserver)
         }
@@ -85,19 +96,25 @@ final class OverlayController: ObservableObject {
             NotificationCenter.default.removeObserver(terminateObserver)
         }
     }
+
+    private func performQuitCleanup() {
+        cameraTask?.cancel()
+        appHider.unhide()
+        wallpaper.restoreWallpapers()
+    }
     
     private func startCameraMonitor() {
-        if enableOnCameraStart {
-            cameraTask = Task { [weak self] in
-                for await isOn in cameraStatusChanges(includeExternal: true) {
-                    guard let self, !Task.isCancelled else { break }
-                    if self.isEnabled != isOn {
-                        self.isEnabled = isOn
-                    }
+        cameraTask?.cancel()
+        cameraTask = nil
+        guard enableOnCameraStart else { return }
+
+        cameraTask = Task { [weak self] in
+            for await isOn in cameraStatusChanges(includeExternal: true) {
+                guard let self, !Task.isCancelled else { break }
+                if self.isEnabled != isOn {
+                    self.isEnabled = isOn
                 }
             }
-        } else {
-            cameraTask?.cancel()
         }
     }
 
@@ -130,6 +147,10 @@ final class OverlayController: ObservableObject {
         } else {
             wallpaper.restoreWallpapers()
         }
+    }
+
+    private static func clampedDimAmount(_ value: Double) -> Double {
+        min(max(value, dimAmountRange.lowerBound), dimAmountRange.upperBound)
     }
 
     private func applyDim() {

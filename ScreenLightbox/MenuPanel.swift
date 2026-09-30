@@ -16,9 +16,11 @@ struct MenuPanel: View {
                     .accessibilityLabel("Dim screens")
             }
 
-            Text("Turns on when a camera is in use.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if overlay.enableOnCameraStart {
+                Text("Turns on when a camera is in use.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Dim Level")

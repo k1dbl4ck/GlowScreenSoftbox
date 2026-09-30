@@ -1,10 +1,20 @@
 import AppKit
 
-@MainActor
 final class WallpaperController {
     private var saved: [CGDirectDisplayID: SavedWallpaper] = [:]
     private var whiteImageURL: URL?
-    
+
+    init() {
+        loadPersistedWallpapers()
+        if !saved.isEmpty {
+            restoreWallpapers()
+        }
+    }
+
+    deinit {
+        restoreWallpapers()
+    }
+
     func applyWhiteWallpapers() {
         do {
             let whiteURL = try ensureWhiteImage()
@@ -28,6 +38,7 @@ final class WallpaperController {
                     options: whiteOptions
                 )
             }
+            persistSavedWallpapers()
         } catch {
             NSLog("Screen Lightbox could not set a white wallpaper: \(error.localizedDescription)")
         }
@@ -47,7 +58,10 @@ final class WallpaperController {
             }
         }
         saved.removeAll()
+        UserDefaults.standard.removeObject(forKey: Self.savedWallpapersKey)
     }
+
+    private static let savedWallpapersKey = "savedWallpapers"
 
     private var whiteOptions: [NSWorkspace.DesktopImageOptionKey: Any] {
         [
@@ -59,6 +73,33 @@ final class WallpaperController {
 
     private func isWhiteWallpaper(_ url: URL) -> Bool {
         url.lastPathComponent == "white.png"
+    }
+
+    private func persistSavedWallpapers() {
+        let payload: [[String: Any]] = saved.map { displayID, wallpaper in
+            [
+                "displayID": displayID,
+                "url": wallpaper.url.absoluteString
+            ]
+        }
+        UserDefaults.standard.set(payload, forKey: Self.savedWallpapersKey)
+    }
+
+    private func loadPersistedWallpapers() {
+        guard saved.isEmpty,
+              let payload = UserDefaults.standard.array(forKey: Self.savedWallpapersKey) as? [[String: Any]] else {
+            return
+        }
+
+        for item in payload {
+            guard let displayIDValue = item["displayID"] as? NSNumber,
+                  let urlString = item["url"] as? String,
+                  let url = URL(string: urlString) else { continue }
+            saved[CGDirectDisplayID(truncating: displayIDValue)] = SavedWallpaper(
+                url: url,
+                options: [:]
+            )
+        }
     }
 
     private func ensureWhiteImage() throws -> URL {
