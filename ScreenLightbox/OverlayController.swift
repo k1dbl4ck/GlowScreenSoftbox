@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import IsCameraOn
 
 @MainActor
 final class OverlayController: ObservableObject {
@@ -17,23 +18,38 @@ final class OverlayController: ObservableObject {
             syncHiddenApps()
         }
     }
+    
+    @Published var enableOnCameraStart: Bool {
+        didSet {
+            UserDefaults.standard.set(enableOnCameraStart, forKey: Self.enableOnCameraStartKey)
+        }
+    }
 
     private static let hideNonFullscreenAppsKey = "hideNonFullscreenApps"
+    private static let enableOnCameraStartKey = "enableOnCameraStart"
     private static let legacyMinimizeKey = "minimizeNonFullscreenWindows"
 
     private var windows: [NSWindow] = []
     private var screenObserver: NSObjectProtocol?
     private var terminateObserver: NSObjectProtocol?
+    private var cameraTask: Task<Void, Never>?
     private let wallpaper = WallpaperController()
     private let appHider = AppHider()
 
     init() {
+        
         if UserDefaults.standard.object(forKey: Self.hideNonFullscreenAppsKey) != nil {
             hideNonFullscreenApps = UserDefaults.standard.bool(forKey: Self.hideNonFullscreenAppsKey)
         } else {
             hideNonFullscreenApps = UserDefaults.standard.bool(forKey: Self.legacyMinimizeKey)
         }
-
+        
+        if UserDefaults.standard.object(forKey: Self.enableOnCameraStartKey) != nil {
+            enableOnCameraStart = UserDefaults.standard.bool(forKey: Self.enableOnCameraStartKey)
+        } else {
+            enableOnCameraStart = false
+        }
+        
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil,
@@ -50,18 +66,38 @@ final class OverlayController: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
-                self?.appHider.unhide()
-                self?.wallpaper.restoreWallpapers()
+                guard let self else { return }
+                self.cameraTask?.cancel()
+                self.appHider.unhide()
+                self.wallpaper.restoreWallpapers()
             }
         }
+
+        startCameraMonitor()
     }
 
     deinit {
+        cameraTask?.cancel()
         if let screenObserver {
             NotificationCenter.default.removeObserver(screenObserver)
         }
         if let terminateObserver {
             NotificationCenter.default.removeObserver(terminateObserver)
+        }
+    }
+    
+    private func startCameraMonitor() {
+        if enableOnCameraStart {
+            cameraTask = Task { [weak self] in
+                for await isOn in cameraStatusChanges(includeExternal: true) {
+                    guard let self, !Task.isCancelled else { break }
+                    if self.isEnabled != isOn {
+                        self.isEnabled = isOn
+                    }
+                }
+            }
+        } else {
+            cameraTask?.cancel()
         }
     }
 

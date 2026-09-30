@@ -4,7 +4,7 @@ import AppKit
 final class WallpaperController {
     private var saved: [CGDirectDisplayID: SavedWallpaper] = [:]
     private var whiteImageURL: URL?
-
+    
     func applyWhiteWallpapers() {
         do {
             let whiteURL = try ensureWhiteImage()

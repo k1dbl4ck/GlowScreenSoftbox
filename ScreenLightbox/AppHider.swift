@@ -11,6 +11,7 @@ final class AppHider {
         let alreadyHidden = Set(hiddenApps.map(\.processIdentifier))
 
         for app in NSWorkspace.shared.runningApplications {
+            NSLog("App name is: \(app.bundleIdentifier)")
             guard app.activationPolicy == .regular else { continue }
             guard app.processIdentifier != selfPID else { continue }
             guard !app.isTerminated else { continue }

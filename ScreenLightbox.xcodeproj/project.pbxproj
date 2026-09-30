@@ -13,6 +13,7 @@
 		A10000000000000000000035 /* WallpaperController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000026 /* WallpaperController.swift */; };
 		A10000000000000000000036 /* AppHider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000027 /* AppHider.swift */; };
 		A10000000000000000000034 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000024 /* Assets.xcassets */; };
+		A10000000000000000000037 /* IsCameraOn in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000081 /* IsCameraOn */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,6 +32,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10000000000000000000037 /* IsCameraOn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -83,6 +85,9 @@
 			dependencies = (
 			);
 			name = ScreenLightbox;
+			packageProductDependencies = (
+				A10000000000000000000081 /* IsCameraOn */,
+			);
 			productName = ScreenLightbox;
 			productReference = A10000000000000000000011 /* ScreenLightbox.app */;
 			productType = "com.apple.product-type.application";
@@ -111,6 +116,9 @@
 				Base,
 			);
 			mainGroup = A10000000000000000000001;
+			packageReferences = (
+				A10000000000000000000080 /* XCRemoteSwiftPackageReference "is-camera-on" */,
+			);
 			productRefGroup = A10000000000000000000003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -260,6 +268,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A10000000000000000000080 /* XCRemoteSwiftPackageReference "is-camera-on" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sindresorhus/is-camera-on";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A10000000000000000000081 /* IsCameraOn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000080 /* XCRemoteSwiftPackageReference "is-camera-on" */;
+			productName = IsCameraOn;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A10000000000000000000000 /* Project object */;
 }
