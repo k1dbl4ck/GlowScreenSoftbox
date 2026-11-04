@@ -5,19 +5,36 @@ import CoreGraphics
 final class AppHider {
     private var hiddenApps: [NSRunningApplication] = []
 
-    func hideAppsWithoutFullscreenWindows() {
+    func hideAppsWithoutFullscreenWindows(on displayIDs: [CGDirectDisplayID]) {
+        guard !displayIDs.isEmpty else {
+            unhide()
+            return
+        }
+
         let fullscreenPIDs = Self.pidsOwningFullscreenWindows()
+        let targetBounds = displayIDs.map { CGDisplayBounds($0) }
+        let pidsOnTargetDisplays = Self.pidsWithWindows(intersecting: targetBounds)
         let selfPID = ProcessInfo.processInfo.processIdentifier
+
+        hiddenApps = hiddenApps.filter { app in
+            guard !app.isTerminated else { return false }
+            let shouldStayHidden = !fullscreenPIDs.contains(app.processIdentifier)
+                && pidsOnTargetDisplays.contains(app.processIdentifier)
+            if !shouldStayHidden {
+                app.unhide()
+            }
+            return shouldStayHidden
+        }
         let alreadyHidden = Set(hiddenApps.map(\.processIdentifier))
 
         for app in NSWorkspace.shared.runningApplications {
-            NSLog("App name is: \(app.bundleIdentifier)")
             guard app.activationPolicy == .regular else { continue }
             guard app.processIdentifier != selfPID else { continue }
             guard !app.isTerminated else { continue }
             guard !alreadyHidden.contains(app.processIdentifier) else { continue }
             guard !app.isHidden else { continue }
             guard !fullscreenPIDs.contains(app.processIdentifier) else { continue }
+            guard pidsOnTargetDisplays.contains(app.processIdentifier) else { continue }
             if app.hide() {
                 hiddenApps.append(app)
             }
@@ -51,6 +68,25 @@ final class AppHider {
             }
         }
 
+        return pids
+    }
+
+    private static func pidsWithWindows(intersecting targetBounds: [CGRect]) -> Set<pid_t> {
+        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        guard let info = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+            return []
+        }
+
+        var pids = Set<pid_t>()
+        for window in info {
+            let layer = window[kCGWindowLayer as String] as? Int ?? 0
+            guard layer == 0 else { continue }
+            guard let pidNumber = window[kCGWindowOwnerPID as String] as? NSNumber else { continue }
+            guard let bounds = cgRect(from: window[kCGWindowBounds as String]) else { continue }
+            if targetBounds.contains(where: { $0.intersects(bounds) }) {
+                pids.insert(pid_t(truncating: pidNumber))
+            }
+        }
         return pids
     }
 

@@ -7,7 +7,7 @@ struct MenuPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Screen Lightbox")
+                Text("Enable Screen Softbox")
                     .font(.headline)
                 Spacer()
                 Toggle("Dim screens", isOn: $overlay.isEnabled)
@@ -33,6 +33,29 @@ struct MenuPanel: View {
             }
             .disabled(!overlay.isEnabled)
             .opacity(overlay.isEnabled ? 1 : 0.45)
+
+            if overlay.showsDisplayPicker {
+                Divider()
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Screens")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    ForEach(overlay.connectedDisplays) { display in
+                        HStack {
+                            Text(display.name)
+                                .font(.headline)
+                                .lineLimit(2)
+                            Spacer()
+                            Toggle(display.name, isOn: displayEnabledBinding(display.uuid))
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+                                .accessibilityLabel(display.name)
+                        }
+                    }
+                }
+            }
 
             Divider()
             
@@ -66,5 +89,14 @@ struct MenuPanel: View {
         }
         .padding(16)
         .frame(width: 320)
+    }
+
+    private func displayEnabledBinding(_ uuid: String) -> Binding<Bool> {
+        Binding(
+            get: {
+                overlay.connectedDisplays.first(where: { $0.uuid == uuid })?.isEnabled ?? true
+            },
+            set: { overlay.setDisplayEnabled(uuid, $0) }
+        )
     }
 }

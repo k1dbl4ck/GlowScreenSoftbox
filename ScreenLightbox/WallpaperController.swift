@@ -15,12 +15,20 @@ final class WallpaperController {
         restoreWallpapers()
     }
 
-    func applyWhiteWallpapers() {
+    func applyWhiteWallpapers(to screens: [NSScreen]) {
+        let targetIDs = Set(screens.map(\.displayID))
+        for screen in NSScreen.screens where !targetIDs.contains(screen.displayID) {
+            restoreWallpaper(on: screen)
+        }
+        persistSavedWallpapers()
+
+        guard !screens.isEmpty else { return }
+
         do {
             let whiteURL = try ensureWhiteImage()
             whiteImageURL = whiteURL
 
-            for screen in NSScreen.screens {
+            for screen in screens {
                 let displayID = screen.displayID
                 if saved[displayID] == nil {
                     if let currentURL = NSWorkspace.shared.desktopImageURL(for: screen),
@@ -46,19 +54,23 @@ final class WallpaperController {
 
     func restoreWallpapers() {
         for screen in NSScreen.screens {
-            guard let previous = saved[screen.displayID] else { continue }
-            do {
-                try NSWorkspace.shared.setDesktopImageURL(
-                    previous.url,
-                    for: screen,
-                    options: previous.options
-                )
-            } catch {
-                NSLog("Screen Lightbox could not restore wallpaper: \(error.localizedDescription)")
-            }
+            restoreWallpaper(on: screen)
         }
         saved.removeAll()
         UserDefaults.standard.removeObject(forKey: Self.savedWallpapersKey)
+    }
+
+    private func restoreWallpaper(on screen: NSScreen) {
+        guard let previous = saved.removeValue(forKey: screen.displayID) else { return }
+        do {
+            try NSWorkspace.shared.setDesktopImageURL(
+                previous.url,
+                for: screen,
+                options: previous.options
+            )
+        } catch {
+            NSLog("Screen Lightbox could not restore wallpaper: \(error.localizedDescription)")
+        }
     }
 
     private static let savedWallpapersKey = "savedWallpapers"
@@ -76,6 +88,10 @@ final class WallpaperController {
     }
 
     private func persistSavedWallpapers() {
+        guard !saved.isEmpty else {
+            UserDefaults.standard.removeObject(forKey: Self.savedWallpapersKey)
+            return
+        }
         let payload: [[String: Any]] = saved.map { displayID, wallpaper in
             [
                 "displayID": displayID,
@@ -155,5 +171,14 @@ extension NSScreen {
     var displayID: CGDirectDisplayID {
         let key = NSDeviceDescriptionKey("NSScreenNumber")
         return deviceDescription[key] as? CGDirectDisplayID ?? 0
+    }
+
+    /// Stable across unplug/replug of the same display. Falls back to the
+    /// session display ID if CoreGraphics does not provide a UUID.
+    var displayUUIDString: String {
+        guard let uuid = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue() else {
+            return "id-\(displayID)"
+        }
+        return CFUUIDCreateString(nil, uuid) as String
     }
 }

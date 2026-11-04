@@ -2,11 +2,20 @@ import AppKit
 import Combine
 import IsCameraOn
 
+struct DisplayChoice: Identifiable, Equatable {
+    var id: String { uuid }
+    let uuid: String
+    let name: String
+    var isEnabled: Bool
+}
+
 @MainActor
 final class OverlayController: ObservableObject {
     @Published var isEnabled = false {
         didSet { syncWindows() }
     }
+
+    @Published private(set) var connectedDisplays: [DisplayChoice] = []
 
     @Published var dimAmount: Double {
         didSet {
@@ -32,9 +41,14 @@ final class OverlayController: ObservableObject {
     private static let hideNonFullscreenAppsKey = "hideNonFullscreenApps"
     private static let enableOnCameraStartKey = "enableOnCameraStart"
     private static let dimAmountKey = "dimAmount"
+    private static let displayEnabledByUUIDKey = "displayEnabledByUUID"
     private static let legacyMinimizeKey = "minimizeNonFullscreenWindows"
     private static let defaultDimAmount = 0.4
     private static let dimAmountRange = 0.05...0.85
+
+    var showsDisplayPicker: Bool {
+        connectedDisplays.count > 1
+    }
 
     private var windows: [NSWindow] = []
     private var screenObserver: NSObjectProtocol?
@@ -69,6 +83,7 @@ final class OverlayController: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
+                self?.refreshDisplays()
                 self?.syncWindows()
             }
         }
@@ -83,7 +98,18 @@ final class OverlayController: ObservableObject {
             }
         }
 
+        refreshDisplays()
         startCameraMonitor()
+    }
+
+    func setDisplayEnabled(_ uuid: String, _ enabled: Bool) {
+        var prefs = displayEnabledPrefs()
+        prefs[uuid] = enabled
+        UserDefaults.standard.set(prefs, forKey: Self.displayEnabledByUUIDKey)
+        if let index = connectedDisplays.firstIndex(where: { $0.uuid == uuid }) {
+            connectedDisplays[index].isEnabled = enabled
+        }
+        syncWindows()
     }
 
     deinit {
@@ -118,6 +144,41 @@ final class OverlayController: ObservableObject {
         }
     }
 
+    private func refreshDisplays() {
+        let prefs = displayEnabledPrefs()
+        connectedDisplays = NSScreen.screens.map { screen in
+            let uuid = screen.displayUUIDString
+            return DisplayChoice(
+                uuid: uuid,
+                name: screen.localizedName,
+                isEnabled: prefs[uuid] ?? true
+            )
+        }
+    }
+
+    /// With one display, always use it. With several, honor remembered checkboxes.
+    private var targetScreens: [NSScreen] {
+        let screens = NSScreen.screens
+        guard screens.count > 1 else { return screens }
+        let enabledUUIDs = Set(connectedDisplays.filter(\.isEnabled).map(\.uuid))
+        return screens.filter { enabledUUIDs.contains($0.displayUUIDString) }
+    }
+
+    private func displayEnabledPrefs() -> [String: Bool] {
+        guard let raw = UserDefaults.standard.dictionary(forKey: Self.displayEnabledByUUIDKey) else {
+            return [:]
+        }
+        var prefs: [String: Bool] = [:]
+        for (key, value) in raw {
+            if let flag = value as? Bool {
+                prefs[key] = flag
+            } else if let number = value as? NSNumber {
+                prefs[key] = number.boolValue
+            }
+        }
+        return prefs
+    }
+
     private func syncWindows() {
         windows.forEach { $0.orderOut(nil) }
         windows.removeAll()
@@ -126,7 +187,7 @@ final class OverlayController: ObservableObject {
 
         guard isEnabled else { return }
 
-        for screen in NSScreen.screens {
+        for screen in targetScreens {
             let window = makeOverlay(on: screen)
             windows.append(window)
             window.orderFrontRegardless()
@@ -135,7 +196,7 @@ final class OverlayController: ObservableObject {
 
     private func syncHiddenApps() {
         if isEnabled, hideNonFullscreenApps {
-            appHider.hideAppsWithoutFullscreenWindows()
+            appHider.hideAppsWithoutFullscreenWindows(on: targetScreens.map(\.displayID))
         } else {
             appHider.unhide()
         }
@@ -143,7 +204,7 @@ final class OverlayController: ObservableObject {
 
     private func syncWallpaper() {
         if isEnabled {
-            wallpaper.applyWhiteWallpapers()
+            wallpaper.applyWhiteWallpapers(to: targetScreens)
         } else {
             wallpaper.restoreWallpapers()
         }

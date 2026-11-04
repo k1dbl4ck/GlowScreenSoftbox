@@ -10,8 +10,8 @@ It lives in the menu bar (sun icon). There is no Dock icon.
 
 When the lightbox is **on**:
 
-1. Every display’s wallpaper is set to solid white (your previous wallpaper is remembered).
-2. A click-through dim overlay sits on the desktop so you can control how bright that white field feels.
+1. Selected displays’ wallpapers are set to solid white (your previous wallpaper is remembered). With only one display, that display is always used.
+2. A click-through dim overlay sits on those desktops so you can control how bright that white field feels.
 3. Optionally, apps that are **not** in fullscreen are hidden so they do not sit on top of the white background. Fullscreen apps (your call window) stay put.
 4. Optionally, the lightbox turns **on** when a camera starts and **off** when every camera stops (FaceTime, Zoom, Continuity Camera, USB cameras, and so on).
 
@@ -25,7 +25,8 @@ Open the sun icon in the menu bar:
 | --- | --- |
 | Main switch | Turns the lightbox on or off |
 | Dim Level | How dark the overlay is (5–85%). Lower is brighter white; higher is more muted. Remembered across launches. |
-| Hide apps that aren't fullscreen | Hides other regular apps so the white desktop shows through. Apps with a fullscreen window are left alone. |
+| Screens | Shown only when more than one display is connected. Choose which displays get the softbox. Choices are remembered by display identity, so a dock unplug/replug restores the same set. |
+| Hide apps that aren't fullscreen | Hides other regular apps that have windows on a selected display so the white desktop shows through. Apps with a fullscreen window are left alone. |
 | Enable when camera starts | Follows camera use automatically. Off by default. |
 | Quit Screen Lightbox | Exits and restores wallpapers |
 
@@ -62,7 +63,7 @@ Quit from the menu panel. Wallpapers are restored on a normal quit. If the app i
 
 Treat this as a **video-call softbox**, not a general night-shift or brightness daemon. The product goals, in order:
 
-1. White field behind the user on all screens.
+1. White field behind the user on the displays they choose (all of them by default).
 2. Manual on/off plus automatic on/off from camera activity.
 3. Optional: get other windows out of the way of that white field (implemented as **hide**, not yellow-button minimize).
 4. Optional: control how bright the field feels (implemented as a **dim overlay**, not hardware display brightness).
@@ -88,7 +89,7 @@ Bundle ID: `com.kid.ScreenLightbox`. Deployment target: macOS 14. Sandbox is **o
 
 - `WallpaperController.applyWhiteWallpapers()`
 - `AppHider.hideAppsWithoutFullscreenWindows()` if that option is on
-- Borderless, click-through overlay windows at `.statusBar` level, sized to each screen’s `visibleFrame` (menu bar and Dock stay clickable)
+- Borderless, click-through overlay windows at `.statusBar` level, sized to each **selected** screen’s `visibleFrame` (menu bar and Dock stay clickable). One connected display always counts as selected.
 
 When it becomes false, wallpapers restore and apps unhide.
 
@@ -109,6 +110,7 @@ Do not switch this back to Accessibility-based window minimize. That permission 
 | `dimAmount` | Overlay alpha, clamped 0.05…0.85; default 0.4 |
 | `hideNonFullscreenApps` | Hide option (legacy key `minimizeNonFullscreenWindows` is still read if the new key is missing) |
 | `enableOnCameraStart` | Camera follow |
+| `displayEnabledByUUID` | Per-display on/off, keyed by `CGDisplayCreateUUIDFromDisplayID` (stable across reconnects). Missing keys default to on. |
 | `savedWallpapers` | Previous wallpaper URLs per display ID while the lightbox is on |
 
 ### Quit / restore
@@ -128,5 +130,5 @@ Also restore from `OverlayController` / `WallpaperController` `deinit`. Force qu
 - Hardware display brightness vs overlay dim
 - Restore hidden apps across force quit (hide list is in-memory only today)
 - Launch at login
-- Per-display dim / wallpaper
+- Per-display dim amount
 - App icon in `Assets.xcassets`
