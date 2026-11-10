@@ -1,8 +1,10 @@
 # Screen Lightbox
 
-A small macOS menu-bar utility that turns your display(s) into a **softbox**: a white backdrop with an adjustable dim overlay. Use it for nicer lighting in video calls, or turn it on by hand whenever you want a clean, bright wall behind you.
+A small macOS menu-bar utility that turns your display(s) into a **softbox**: a white backdrop with an adjustable dim overlay. Use it for nicer lighting in video calls, or turn it on by hand whenever you want a clean, bright light in front of you.
 
 It lives in the menu bar (sun icon). There is no Dock icon.
+
+![Screen Lightbox menu: enable switch, dim level, per-display screens, hide apps, and camera follow](screenshot.png)
 
 ## For users
 
